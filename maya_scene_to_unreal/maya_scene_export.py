@@ -10,7 +10,15 @@ def get_maya_main_window():
     return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
 
 
+# UNSUPPORTED_NODE_TYPES = ['nurbsSurface', 'nurbsCurve', 'nurbsSurface', 'nurbsCurve', 'hairSystem', 'fluidShape',
+#                           'particle', 'cluster', 'lattice', 'blendShape', 'rigidBody', 'softBody',
+#                           'aiStandardSurface', 'lambert', 'shadingNode', 'subdSurface', 'deformer',
+#                           'shadingNetwork', 'volume', 'bifrost', 'nCloth', 'nParticle', 'surfaceShader', 'fluid']
+
 class UnrealExporter(QtWidgets.QWidget):
+    UNSUPPORTED_NODE_TYPES = ['nurbsSurface', 'nurbsCurve', 'lattice', 'cluster', 'particle',
+                              'nCloth', 'particle', 'blendShape']
+
     def __init__(self, parent=None):
         super(UnrealExporter, self).__init__(parent)
         self.setWindowTitle("Unreal Exporter")
@@ -42,24 +50,19 @@ class UnrealExporter(QtWidgets.QWidget):
         self.textures_checkbox = QtWidgets.QCheckBox("Export Textures")
 
         # Set all checkboxes to be checked by default
-        self.mesh_checkbox.setChecked(True)
-        self.anim_checkbox.setChecked(True)
-        self.skel_checkbox.setChecked(True)
-        self.cameras_checkbox.setChecked(True)
-        self.lights_checkbox.setChecked(True)
-        self.materials_checkbox.setChecked(True)
-        self.textures_checkbox.setChecked(True)
+        for checkbox in [self.mesh_checkbox, self.anim_checkbox, self.skel_checkbox,
+                         self.cameras_checkbox, self.lights_checkbox, self.materials_checkbox,
+                         self.textures_checkbox]:
+            checkbox.setChecked(True)
 
-        layout.addWidget(self.mesh_checkbox)
-        layout.addWidget(self.anim_checkbox)
-        layout.addWidget(self.skel_checkbox)
-        layout.addWidget(self.cameras_checkbox)
-        layout.addWidget(self.lights_checkbox)
-        layout.addWidget(self.materials_checkbox)
-        layout.addWidget(self.textures_checkbox)
+        for checkbox in [self.mesh_checkbox, self.anim_checkbox, self.skel_checkbox,
+                         self.cameras_checkbox, self.lights_checkbox, self.materials_checkbox,
+                         self.textures_checkbox]:
+            layout.addWidget(checkbox)
 
         self.unsupported_list = QtWidgets.QListWidget()
         self.unsupported_list.setVisible(False)
+        self.unsupported_list.itemDoubleClicked.connect(self.select_maya_object)
         layout.addWidget(self.unsupported_list)
 
         self.check_button = QtWidgets.QPushButton("Check Scene for Unreal")
@@ -83,53 +86,53 @@ class UnrealExporter(QtWidgets.QWidget):
 
     def check_scene_for_unreal(self):
         issues = []
-
-        # Check for supported node types
-        unsupported_nodes = cmds.ls(type=['nurbsSurface', 'nurbsCurve'])
+        unsupported_nodes = cmds.ls(type=self.UNSUPPORTED_NODE_TYPES)
         if unsupported_nodes:
-            issues.append(f"Unsupported node types found: {unsupported_nodes}")
-
-        return issues
+            issues.append(f"Unsupported node types found: {', '.join(unsupported_nodes)}")
+        return unsupported_nodes
 
     def export_to_fbx(self, output_path):
-        # Set the FBX export settings
-        mel.eval('FBXExportSmoothingGroups -v true')
-        mel.eval('FBXExportHardEdges -v false')
-        mel.eval('FBXExportTangents -v false')
-        mel.eval('FBXExportSmoothMesh -v true')
-        mel.eval('FBXExportInstances -v false')
-        mel.eval('FBXExportBakeComplexAnimation -v false')
-        mel.eval('FBXExportConstraints -v false')
-        mel.eval('FBXExportCameras -v true')
-        mel.eval('FBXExportLights -v true')
-        mel.eval('FBXExportEmbeddedTextures -v false')
-        mel.eval('FBXExportInputConnections -v true')
-        mel.eval('FBXExportUpAxis "y"')
+        try:
+            # Set the FBX export settings
+            mel.eval('FBXExportSmoothingGroups -v true')
+            mel.eval('FBXExportHardEdges -v false')
+            mel.eval('FBXExportTangents -v false')
+            mel.eval('FBXExportSmoothMesh -v true')
+            mel.eval('FBXExportInstances -v false')
+            mel.eval('FBXExportBakeComplexAnimation -v false')
+            mel.eval('FBXExportConstraints -v false')
+            mel.eval('FBXExportCameras -v true')
+            mel.eval('FBXExportLights -v true')
+            mel.eval('FBXExportEmbeddedTextures -v false')
+            mel.eval('FBXExportInputConnections -v true')
+            mel.eval('FBXExportUpAxis "y"')
 
-        # Export the selection or the entire scene if nothing is selected
-        export_types = []
-        if self.mesh_checkbox.isChecked():
-            export_types.append('mesh')
-        if self.anim_checkbox.isChecked():
-            export_types.append('animCurve')
-        if self.skel_checkbox.isChecked():
-            export_types.append('joint')
-        if self.cameras_checkbox.isChecked():
-            export_types.append('camera')
-        if self.lights_checkbox.isChecked():
-            export_types.append('light')
-        if self.materials_checkbox.isChecked():
-            export_types.append('shadingEngine')
-        if self.textures_checkbox.isChecked():
-            export_types.append('fileTexture')
+            # Export the selection or the entire scene if nothing is selected
+            export_types = []
+            if self.mesh_checkbox.isChecked():
+                export_types.append('mesh')
+            if self.anim_checkbox.isChecked():
+                export_types.append('animCurve')
+            if self.skel_checkbox.isChecked():
+                export_types.append('joint')
+            if self.cameras_checkbox.isChecked():
+                export_types.append('camera')
+            if self.lights_checkbox.isChecked():
+                export_types.append('light')
+            if self.materials_checkbox.isChecked():
+                export_types.append('shadingEngine')
+            if self.textures_checkbox.isChecked():
+                export_types.append('fileTexture')
 
-        if export_types:
-            cmds.select(clear=True)
-            for etype in export_types:
-                cmds.select(cmds.ls(type=etype), add=True)
+            if export_types:
+                cmds.select(clear=True)
+                for etype in export_types:
+                    cmds.select(cmds.ls(type=etype), add=True)
 
-        # Export to FBX
-        cmds.file(output_path, force=True, options="v=0", type="FBX export", pr=True, es=True)
+            # Export to FBX
+            cmds.file(output_path, force=True, options="v=0", type="FBX export", pr=True, es=True)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Export Error", f"Failed to export scene: {e}")
 
     def run_qc_checks(self):
         issues = self.check_scene_for_unreal()
@@ -144,6 +147,14 @@ class UnrealExporter(QtWidgets.QWidget):
         else:
             self.unsupported_list.setVisible(False)
             QtWidgets.QMessageBox.information(self, 'QC Passed', 'No issues found. Ready to export.')
+
+    def select_maya_object(self, item):
+        if cmds.objExists(item):
+            cmds.select(item)
+            cmds.viewFit(item)  # Fit the selected object in the view
+        else:
+            QtWidgets.QMessageBox.warning(self, "Selection Error",
+                                          f"Object '{item}' does not exist in the scene.")
 
     def show_export_popup(self):
         export_path = self.export_path_field.text()
@@ -188,8 +199,8 @@ def show_ui():
         exporter.close()
     except:
         pass
-    exporter = UnrealExporter()
-    exporter.setParent(maya_main_window, QtCore.Qt.Window)
+    exporter = UnrealExporter(parent=maya_main_window)
+    exporter.setWindowFlags(QtCore.Qt.Window)
     exporter.show()
 
 
