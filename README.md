@@ -1,2 +1,1 @@
-# Maya-Unreal
-usefull tools to helps convertion from maya to unreal 
+# usefull tools to helps convertion from maya to unreal 
